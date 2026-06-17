@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据可视化图表渲染引擎 - 演示</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f5f7fa;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #7f8c8d;
+      margin-bottom: 30px;
+    }
+
+    .controls {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 14px;
+      color: #34495e;
+      font-weight: 500;
+    }
+
+    select, button {
+      padding: 8px 12px;
+      border: 1px solid #dfe6e9;
+      border-radius: 4px;
+      font-size: 14px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+    }
+
+    button:hover {
+      background: #2980b9;
+    }
+
+    button.secondary {
+      background: #95a5a6;
+    }
+
+    button.secondary:hover {
+      background: #7f8c8d;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .chart-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .chart-card h3 {
+      color: #2c3e50;
+      margin-bottom: 15px;
+      font-size: 16px;
+    }
+
+    .chart-container {
+      width: 100%;
+      height: 350px;
+    }
+
+    .info-panel {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+    }
+
+    .info-panel h3 {
+      color: #2c3e50;
+      margin-bottom: 10px;
+    }
+
+    .info-panel p {
+      color: #7f8c8d;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .code-block {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+
+    @media (max-width: 900px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 数据可视化图表渲染引擎</h1>
+    <p class="subtitle">底层实现 · 模块化设计 · SVG/Canvas双渲染 · 支持交互</p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>渲染器:</label>
+        <select id="rendererSelect">
+          <option value="svg">SVG</option>
+          <option value="canvas">Canvas</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>X轴比例尺:</label>
+        <select id="xScaleSelect">
+          <option value="linear">线性</option>
+          <option value="log">对数</option>
+          <option value="ordinal">序数</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Y轴比例尺:</label>
+        <select id="yScaleSelect">
+          <option value="linear">线性</option>
+          <option value="log">对数</option>
+        </select>
+      </div>
+      <button id="resetBtn" class="secondary">重置视图</button>
+      <button id="bigDataBtn">大数据测试 (10万点)</button>
+    </div>
+
+    <div class="info-panel">
+      <h3>💡 使用说明</h3>
+      <p>
+        <strong>交互操作：</strong>
+        鼠标滚轮缩放 · 拖拽平移 · 悬停显示数据提示 · 双击重置视图 · 鼠标悬停显示十字线和数据详情
+      </p>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>📈 折线图 (Line Chart)</h3>
+        <div id="lineChart" class="chart-container"></div>
+      </div>
+
+      <div class="chart-card">
+        <h3>📊 柱状图 (Bar Chart)</h3>
+        <div id="barChart" class="chart-container"></div>
+      </div>
+
+      <div class="chart-card">
+        <h3>💫 散点图 (Scatter Chart)</h3>
+        <div id="scatterChart" class="chart-container"></div>
+      </div>
+
+      <div class="chart-card">
+        <h3>📊 多系列组合图 (Multi-Series)</h3>
+        <div id="multiChart" class="chart-container"></div>
+      </div>
+    </div>
+
+    <div class="info-panel">
+      <h3>📚 核心模块架构</h3>
+      <div class="code-block">
+┌─────────────────────────────────────────────────────┐
+│                  Chart (入口)                       │
+├────────────┬────────────┬───────────┬──────────────┤
+│  Scales    │   Axes     │ Geometries │  Renderers   │
+│  (比例尺)  │  (坐标轴)  │  (几何)   │  (渲染器)    │
+├────────────┼────────────┼───────────┼──────────────┤
+│ • linear   │ • tickStep │ • Line    │ • SVG        │
+│ • log      │ • nice     │ • Bar     │ • Canvas     │
+│ • ordinal  │ • ticks    │ • Scatter │              │
+├────────────┴────────────┴───────────┴──────────────┤
+│              Interactions (交互)                    │
+│  • Zoom (缩放/平移)   • Tooltip (数据提示)          │
+├─────────────────────────────────────────────────────┤
+│               Layout (布局)                         │
+│  • 边距计算   • 图例位置   • 标题位置                │
+└─────────────────────────────────────────────────────┘
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createChart } from './src/index.js';
+
+    const lineData = [];
+    for (let i = 0; i < 20; i++) {
+      lineData.push({
+        x: i,
+        y: Math.sin(i * 0.5) * 50 + 100 + Math.random() * 20
+      });
+    }
+
+    const barData = [
+      { category: '一月', value: 120 },
+      { category: '二月', value: 200 },
+      { category: '三月', value: 150 },
+      { category: '四月', value: 80 },
+      { category: '五月', value: 220 },
+      { category: '六月', value: 180 },
+      { category: '七月', value: 250 }
+    ];
+
+    const scatterData = [];
+    for (let i = 0; i < 200; i++) {
+      scatterData.push({
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        value: Math.random() * 50
+      });
+    }
+
+    const series1Data = [];
+    const series2Data = [];
+    for (let i = 0; i < 15; i++) {
+      series1Data.push({ x: i, y: i * 10 + Math.random() * 30 });
+      series2Data.push({ x: i, y: i * 8 + 50 + Math.random() * 20 });
+    }
+
+    const chartOptions = {
+      width: 600,
+      height: 350,
+      margin: { top: 40, right: 80, bottom: 60, left: 60 },
+      tooltip: true,
+      zoom: true
+    };
+
+    const lineChart = createChart(document.getElementById('lineChart'), {
+      ...chartOptions,
+      title: '月度销售趋势'
+    });
+    lineChart.setData({
+      type: 'line',
+      data: lineData,
+      xField: 'x',
+      yField: 'y',
+      name: '销售额',
+      color: '#5470c6'
+    });
+    lineChart.render();
+
+    const barChart = createChart(document.getElementById('barChart'), {
+      ...chartOptions,
+      xScaleType: 'ordinal',
+      title: '各月销量统计'
+    });
+    barChart.setData({
+      type: 'bar',
+      data: barData,
+      xField: 'category',
+      yField: 'value',
+      name: '销量',
+      color: '#91cc75'
+    });
+    barChart.render();
+
+    const scatterChart = createChart(document.getElementById('scatterChart'), {
+      ...chartOptions,
+      title: '数据分布散点图'
+    });
+    scatterChart.setData({
+      type: 'scatter',
+      data: scatterData,
+      xField: 'x',
+      yField: 'y',
+      name: '样本点',
+      color: '#ee6666'
+    });
+    scatterChart.render();
+
+    const multiChart = createChart(document.getElementById('multiChart'), {
+      ...chartOptions,
+      title: '多系列对比'
+    });
+    multiChart.setData([
+      {
+        type: 'line',
+        data: series1Data,
+        xField: 'x',
+        yField: 'y',
+        name: '产品A',
+        color: '#5470c6'
+      },
+      {
+        type: 'line',
+        data: series2Data,
+        xField: 'x',
+        yField: 'y',
+        name: '产品B',
+        color: '#91cc75'
+      }
+    ]);
+    multiChart.render();
+
+    const allCharts = [lineChart, barChart, scatterChart, multiChart];
+
+    document.getElementById('rendererSelect').addEventListener('change', (e) => {
+      const renderer = e.target.value;
+      allCharts.forEach(chart => chart.setRendererType(renderer));
+    });
+
+    document.getElementById('xScaleSelect').addEventListener('change', (e) => {
+      const type = e.target.value;
+      allCharts.forEach(chart => chart.updateXScaleType(type));
+    });
+
+    document.getElementById('yScaleSelect').addEventListener('change', (e) => {
+      const type = e.target.value;
+      allCharts.forEach(chart => chart.updateYScaleType(type));
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      allCharts.forEach(chart => chart.resetZoom());
+    });
+
+    document.getElementById('bigDataBtn').addEventListener('click', () => {
+      const bigData = [];
+      for (let i = 0; i < 100000; i++) {
+        bigData.push({
+          x: i,
+          y: Math.sin(i * 0.01) * 50 + Math.sin(i * 0.001) * 100 + Math.random() * 20
+        });
+      }
+
+      lineChart.setRendererType('canvas');
+      document.getElementById('rendererSelect').value = 'canvas';
+      
+      lineChart.setData({
+        type: 'line',
+        data: bigData,
+        xField: 'x',
+        yField: 'y',
+        name: '10万数据点',
+        color: '#5470c6'
+      });
+      lineChart.setTitle('折线图 - 10万数据点 (自动RDP抽稀)');
+      lineChart.render();
+
+      alert('已切换到 Canvas 渲染器并加载 100,000 个数据点！\n使用 RDP 算法自动抽稀以保证性能。');
+    });
+  </script>
+</body>
+</html>

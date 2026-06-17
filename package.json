@@ -1,0 +1,20 @@
+{
+  "name": "chart-engine",
+  "version": "1.0.0",
+  "description": "底层数据可视化图表渲染引擎 - 不依赖第三方图表库",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "npx serve .",
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "chart",
+    "visualization",
+    "svg",
+    "canvas",
+    "data-visualization"
+  ],
+  "author": "",
+  "license": "MIT"
+}
