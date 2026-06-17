@@ -2,6 +2,7 @@ import { Scale } from '../types';
 
 export function tickStep(start: number, stop: number, count: number): number {
   const rawStep = Math.abs(stop - start) / Math.max(1, count);
+  if (rawStep === 0 || !isFinite(rawStep)) return 1;
   const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
   const normalized = rawStep / magnitude;
 
@@ -20,19 +21,18 @@ export function tickStep(start: number, stop: number, count: number): number {
 
 export function niceDomain(domain: [number, number], count: number = 10): [number, number] {
   let [start, stop] = domain;
-  const step = tickStep(start, stop, count);
-
+  if (!isFinite(start) || !isFinite(stop)) return [0, 1];
   if (start === stop) {
-    const delta = step > 0 ? step : 1;
-    start -= delta / 2;
-    stop += delta / 2;
+    start -= 0.5;
+    stop += 0.5;
   }
 
-  if (start === Infinity) start = 0;
-  if (stop === -Infinity) stop = 1;
+  const step = tickStep(start, stop, count);
 
   const niceStart = Math.floor(start / step) * step;
   const niceStop = Math.ceil(stop / step) * step;
+
+  if (!isFinite(niceStart) || !isFinite(niceStop)) return [0, 1];
 
   return [niceStart, niceStop];
 }
@@ -52,7 +52,8 @@ export function ticks(domain: [number, number], count: number = 10): number[] {
 
   let current = Math.ceil(actualStart / step) * step;
   const maxTicks = Math.floor((actualStop - actualStart) / step) + 1;
-  const precision = -Math.floor(Math.log10(step));
+  const rawPrecision = -Math.floor(Math.log10(step));
+  const precision = Math.max(0, Math.min(100, rawPrecision));
 
   for (let i = 0; i < maxTicks && current <= actualStop; i++) {
     const value = parseFloat(current.toFixed(precision));
@@ -63,6 +64,10 @@ export function ticks(domain: [number, number], count: number = 10): number[] {
   return isDescending ? results.reverse() : results;
 }
 
+import { createLinearScale } from './linear';
+import { createLogScale } from './log';
+import { createOrdinalScale } from './ordinal';
+
 export function createScale(
   type: 'linear' | 'log' | 'ordinal',
   domain: [number, number] | string[],
@@ -70,11 +75,11 @@ export function createScale(
 ): Scale {
   switch (type) {
     case 'linear':
-      return require('./linear').createLinearScale(domain as [number, number], range);
+      return createLinearScale(domain as [number, number], range);
     case 'log':
-      return require('./log').createLogScale(domain as [number, number], range);
+      return createLogScale(domain as [number, number], range);
     case 'ordinal':
-      return require('./ordinal').createOrdinalScale(domain as string[], range);
+      return createOrdinalScale(domain as string[], range);
     default:
       throw new Error(`Unknown scale type: ${type}`);
   }

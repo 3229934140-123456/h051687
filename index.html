@@ -234,7 +234,7 @@
   </div>
 
   <script type="module">
-    import { createChart } from './src/index.js';
+    import { createChart } from './src/index.ts';
 
     const lineData = [];
     for (let i = 0; i < 20; i++) {
@@ -354,7 +354,11 @@
 
     document.getElementById('xScaleSelect').addEventListener('change', (e) => {
       const type = e.target.value;
-      allCharts.forEach(chart => chart.updateXScaleType(type));
+      allCharts.forEach(chart => {
+        if (!chart.getIsOrdinalX()) {
+          chart.updateXScaleType(type);
+        }
+      });
     });
 
     document.getElementById('yScaleSelect').addEventListener('change', (e) => {
@@ -388,8 +392,6 @@
       });
       lineChart.setTitle('折线图 - 10万数据点 (自动RDP抽稀)');
       lineChart.render();
-
-      alert('已切换到 Canvas 渲染器并加载 100,000 个数据点！\n使用 RDP 算法自动抽稀以保证性能。');
     });
   </script>
 </body>

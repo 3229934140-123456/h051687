@@ -35,6 +35,7 @@ export class Chart {
   private legendItems: LegendItem[] = [];
   private originalXDomain: [number, number] | string[] | null = null;
   private originalYDomain: [number, number] | string[] | null = null;
+  private isOrdinalX: boolean = false;
 
   constructor(container: HTMLElement, options: Partial<ChartOptions> = {}) {
     this.container = container;
@@ -83,6 +84,17 @@ export class Chart {
     }
   }
 
+  private syncPlotOffset(): void {
+    if (!this.layoutResult) return;
+    const { plotLeft, plotTop } = this.layoutResult;
+    if (this.zoomInteraction) {
+      this.zoomInteraction.setPlotOffset(plotLeft, plotTop);
+    }
+    if (this.tooltipInteraction) {
+      this.tooltipInteraction.setPlotOffset(plotLeft, plotTop);
+    }
+  }
+
   setData(configs: ChartConfig | ChartConfig[]): void {
     this.chartConfigs = Array.isArray(configs) ? configs : [configs];
 
@@ -101,6 +113,8 @@ export class Chart {
       color: c.color!
     }));
 
+    this.isOrdinalX = this.detectOrdinalX();
+
     this.createScales();
     this.createAxes();
     this.createGeometries();
@@ -110,6 +124,17 @@ export class Chart {
     }
 
     this.updateLayout();
+
+    if (this.zoomInteraction) {
+      this.zoomInteraction.resetTransform();
+    }
+  }
+
+  private detectOrdinalX(): boolean {
+    if (!this.chartConfigs.length) return false;
+    const xField = this.chartConfigs[0].xField;
+    const sample = this.chartConfigs[0].data.slice(0, 5);
+    return sample.some(d => typeof d[xField] === 'string');
   }
 
   private createScales(): void {
@@ -117,28 +142,34 @@ export class Chart {
     const xValues = allData.map(d => d[this.chartConfigs[0].xField]);
     const yValues = allData.map(d => d[this.chartConfigs[0].yField]);
 
-    if (this.options.xScaleType === 'ordinal') {
+    if (this.isOrdinalX) {
       const domain = unique(xValues).map(v => v.toString());
       this.xScale = createOrdinalScale(domain);
     } else {
       const numericXValues = xValues.filter(isNumber) as number[];
       const bounds = extent(numericXValues);
-      this.xScale = this.options.xScaleType === 'log'
-        ? createLogScale(bounds)
-        : createLinearScale(bounds);
+      this.xScale = this.createSafeScale(this.options.xScaleType, bounds);
     }
 
     const numericYValues = yValues.filter(isNumber) as number[];
     const yBounds = extent(numericYValues);
-    this.yScale = this.options.yScaleType === 'log'
-      ? createLogScale(yBounds)
-      : createLinearScale(yBounds);
+    this.yScale = this.createSafeScale(this.options.yScaleType, yBounds);
 
     this.xScale.nice();
     this.yScale.nice();
 
     this.originalXDomain = [...this.xScale.domain] as [number, number] | string[];
     this.originalYDomain = [...this.yScale.domain] as [number, number] | string[];
+  }
+
+  private createSafeScale(type: ScaleType, bounds: [number, number]): Scale {
+    if (type === 'log') {
+      if (bounds[0] <= 0 || bounds[1] <= 0 || !isFinite(bounds[0]) || !isFinite(bounds[1])) {
+        return createLinearScale(bounds);
+      }
+      return createLogScale(bounds);
+    }
+    return createLinearScale(bounds);
   }
 
   private createAxes(): void {
@@ -212,6 +243,8 @@ export class Chart {
       g.setScales(this.xScale!, this.yScale!);
       g.update();
     });
+
+    this.syncPlotOffset();
   }
 
   render(): void {
@@ -222,20 +255,21 @@ export class Chart {
     this.renderer.clear();
 
     const { plotLeft, plotTop, plotWidth, plotHeight, legendPosition, titlePosition } = this.layoutResult!;
+    const zoomTransform = this.zoomInteraction ? this.zoomInteraction.getTransform() : { k: 1, tx: 0, ty: 0 };
 
     if (this.options.title && titlePosition) {
       this.renderer.drawTitle(this.options.title, titlePosition.x, titlePosition.y);
     }
 
-    if (this.xAxis) {
-      this.renderer.drawGrid(this.xAxis.getGeometry(), true, plotWidth, plotHeight);
-    }
+    const renderGridAndContent = () => {
+      if (this.xAxis) {
+        this.renderer.drawGrid(this.xAxis.getGeometry(), true, plotWidth, plotHeight);
+      }
 
-    if (this.yAxis) {
-      this.renderer.drawGrid(this.yAxis.getGeometry(), false, plotWidth, plotHeight);
-    }
+      if (this.yAxis) {
+        this.renderer.drawGrid(this.yAxis.getGeometry(), false, plotWidth, plotHeight);
+      }
 
-    const renderPlotContent = () => {
       this.geometries.forEach(geometry => {
         geometry.update();
 
@@ -250,12 +284,19 @@ export class Chart {
     };
 
     if (this.options.renderer === 'svg') {
-      (this.renderer as any).setPlotTransform({ x: plotLeft, y: plotTop, scale: 1 });
-      renderPlotContent();
+      const svgRenderer = this.renderer as any;
+      svgRenderer.setPlotTransform({
+        x: plotLeft + zoomTransform.tx,
+        y: plotTop + zoomTransform.ty,
+        scale: zoomTransform.k
+      });
+      renderGridAndContent();
     } else {
-      (this.renderer as any).withTransform(() => {
-        this.renderer['ctx'].translate(plotLeft, plotTop);
-        renderPlotContent();
+      const canvasRenderer = this.renderer as any;
+      canvasRenderer.withTransform(() => {
+        canvasRenderer.ctx.translate(plotLeft + zoomTransform.tx, plotTop + zoomTransform.ty);
+        canvasRenderer.ctx.scale(zoomTransform.k, zoomTransform.k);
+        renderGridAndContent();
       });
     }
 
@@ -273,11 +314,19 @@ export class Chart {
   }
 
   updateXScaleType(type: ScaleType): void {
-    this.options.xScaleType = type;
+    if (this.isOrdinalX && type !== 'ordinal') {
+      return;
+    }
+    if (!this.isOrdinalX) {
+      this.options.xScaleType = type;
+    }
     this.createScales();
     this.createAxes();
     this.createGeometries();
     this.updateLayout();
+    if (this.zoomInteraction) {
+      this.zoomInteraction.resetTransform();
+    }
     this.render();
   }
 
@@ -287,6 +336,9 @@ export class Chart {
     this.createAxes();
     this.createGeometries();
     this.updateLayout();
+    if (this.zoomInteraction) {
+      this.zoomInteraction.resetTransform();
+    }
     this.render();
   }
 
@@ -319,6 +371,7 @@ export class Chart {
       this.tooltipInteraction.setGeometries(this.geometries);
     }
 
+    this.syncPlotOffset();
     this.render();
   }
 
@@ -413,6 +466,10 @@ export class Chart {
 
   getRenderer(): Renderer {
     return this.renderer;
+  }
+
+  getIsOrdinalX(): boolean {
+    return this.isOrdinalX;
   }
 
   destroy(): void {

@@ -101,27 +101,25 @@ export class TooltipInteraction extends Interaction {
   }
 
   findNearestDataPoint(screenX: number, screenY: number): TooltipData | null {
-    const dataPoint = this.screenToData(screenX, screenY);
+    const dataCoord = this.screenToData(screenX, screenY);
 
     let nearest: TooltipData | null = null;
     let minDist = Infinity;
 
     for (const geometry of this.geometries) {
-      const result = geometry.getNearestDataPoint(
-        dataPoint.x,
-        dataPoint.y,
-        this.searchRadius
-      );
+      const points = geometry.getPoints();
+      for (let i = 0; i < points.length; i++) {
+        const dx = points[i].x - dataCoord.x;
+        const dy = points[i].y - dataCoord.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (result) {
-        const point = geometry.getPoints()[result.index];
-        if (result.distance < minDist) {
-          minDist = result.distance;
+        if (dist < minDist && dist <= this.searchRadius / this.transform.k) {
+          minDist = dist;
           nearest = {
-            data: result.data,
+            data: geometry.getData()[i] || { x: points[i].x, y: points[i].y },
             geometry,
-            distance: result.distance,
-            point
+            distance: dist,
+            point: points[i]
           };
         }
       }

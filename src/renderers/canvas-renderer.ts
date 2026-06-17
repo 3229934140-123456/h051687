@@ -313,8 +313,6 @@ export class CanvasRenderer extends Renderer {
 
   withTransform(callback: () => void): void {
     this.ctx.save();
-    this.ctx.translate(this.transform.tx, this.transform.ty);
-    this.ctx.scale(this.transform.k, this.transform.k);
     callback();
     this.ctx.restore();
   }

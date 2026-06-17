@@ -112,17 +112,20 @@ export class ZoomInteraction extends Interaction {
     this.resetTransform();
   }
 
-  zoomAt(screenX: number, screenY: number, scale: number): void {
+  zoomAt(screenX: number, screenY: number, scaleFactor: number): void {
     const [minZoom, maxZoom] = this.options.zoomExtent;
-    const newK = Math.max(minZoom, Math.min(maxZoom, this.transform.k * scale));
+    const newK = Math.max(minZoom, Math.min(maxZoom, this.transform.k * scaleFactor));
 
-    if (newK === this.transform.k) return;
+    if (Math.abs(newK - this.transform.k) < 1e-10) return;
 
     const dataPoint = this.screenToData(screenX, screenY);
 
-    const actualScale = newK / this.transform.k;
-    const newTx = screenX - dataPoint.x * newK;
-    const newTy = screenY - dataPoint.y * newK;
+    const offset = this.getPlotOffset();
+    const plotX = screenX - offset.left;
+    const plotY = screenY - offset.top;
+
+    const newTx = plotX - dataPoint.x * newK;
+    const newTy = plotY - dataPoint.y * newK;
 
     this.setTransform({
       k: newK,
